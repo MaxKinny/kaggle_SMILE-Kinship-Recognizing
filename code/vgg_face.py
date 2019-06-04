@@ -12,6 +12,7 @@ from keras.optimizers import Adam
 from keras_vggface.utils import preprocess_input
 from keras_vggface.vggface import VGGFace
 
+basestr = ''
 train_file_path = "../input/train_relationships.csv"
 train_folders_path = "../input/train/"
 val_famillies = "F09"
@@ -114,13 +115,20 @@ def baseline_model():
     return model
 
 
-file_path = "vgg_face.h5"
+file_path = "vgg_face_" + basestr + ".h5"
 
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
 reduce_on_plateau = ReduceLROnPlateau(monitor="val_acc", mode="max", factor=0.1, patience=20, verbose=1)
 
-callbacks_list = [checkpoint, reduce_on_plateau]
+from keras.callbacks import TensorBoard
+tbCallBack = TensorBoard(log_dir='./logs/'+basestr,
+                         histogram_freq=0,
+                         write_graph=True,
+                         write_images=True)
+
+
+callbacks_list = [checkpoint, reduce_on_plateau, tbCallBack]
 
 model = baseline_model()
 # model.load_weights(file_path)
@@ -153,4 +161,4 @@ for batch in tqdm(chunker(submission.img_pair.values)):
 
 submission['is_related'] = predictions
 
-submission.to_csv("vgg_face.csv", index=False)
+submission.to_csv("vgg_face_"+basestr+".csv", index=False)

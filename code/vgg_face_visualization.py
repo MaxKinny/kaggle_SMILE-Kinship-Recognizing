@@ -5,13 +5,14 @@ from random import choice, sample
 import cv2
 import numpy as np
 import pandas as pd
-from keras.applications.resnet50 import ResNet50, preprocess_input
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras.layers import Input, Dense, GlobalMaxPool2D, GlobalAvgPool2D, Concatenate, Multiply, Dropout, Subtract
 from keras.models import Model
 from keras.optimizers import Adam
+from keras_vggface.utils import preprocess_input
+from keras_vggface.vggface import VGGFace
+import keras
 
-basestr = ''
 train_file_path = "../input/train_relationships.csv"
 train_folders_path = "../input/train/"
 val_famillies = "F09"
@@ -43,7 +44,8 @@ val = [x for x in relationships if val_famillies in x[0]]
 
 def read_img(path):
     img = cv2.imread(path)
-    return preprocess_input(img)
+    img = np.array(img).astype(np.float)
+    return preprocess_input(img, version=2)
 
 
 def gen(list_tuples, person_to_images_map, batch_size=16):
@@ -76,7 +78,7 @@ def baseline_model():
     input_1 = Input(shape=(224, 224, 3))
     input_2 = Input(shape=(224, 224, 3))
 
-    base_model = ResNet50(weights='imagenet', include_top=False)
+    base_model = VGGFace(model='resnet50', include_top=False)
 
     for x in base_model.layers[:-3]:
         x.trainable = True
@@ -113,14 +115,14 @@ def baseline_model():
     return model
 
 
-file_path = "baseline_"+basestr+".h5"
+file_path = "vgg_face_visualization.h5"
 
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
 reduce_on_plateau = ReduceLROnPlateau(monitor="val_acc", mode="max", factor=0.1, patience=20, verbose=1)
 
 from keras.callbacks import TensorBoard
-tbCallBack = TensorBoard(log_dir='./logs/'+basestr,
+tbCallBack = TensorBoard(log_dir='./logs/nasnet',
                          histogram_freq=0,
                          write_graph=True,
                          write_images=True)
@@ -130,7 +132,7 @@ callbacks_list = [checkpoint, reduce_on_plateau, tbCallBack]
 model = baseline_model()
 # model.load_weights(file_path)
 model.fit_generator(gen(train, train_person_to_images_map, batch_size=16), use_multiprocessing=True,
-                    validation_data=gen(val, val_person_to_images_map, batch_size=16), epochs=100, verbose=2,
+                    validation_data=gen(val, val_person_to_images_map, batch_size=16), epochs=50, verbose=2,
                     workers=4, callbacks=callbacks_list, steps_per_epoch=200, validation_steps=100)
 
 test_path = "../input/test/"
@@ -158,4 +160,4 @@ for batch in tqdm(chunker(submission.img_pair.values)):
 
 submission['is_related'] = predictions
 
-submission.to_csv("baseline_"+basestr+".csv", index=False)
+submission.to_csv("vgg_face_visualization.csv", index=False)

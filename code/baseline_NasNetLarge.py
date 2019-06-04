@@ -6,12 +6,13 @@ import cv2
 import numpy as np
 import pandas as pd
 from keras.applications.resnet50 import ResNet50, preprocess_input
+from keras.applications.nasnet import NASNetLarge
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras.layers import Input, Dense, GlobalMaxPool2D, GlobalAvgPool2D, Concatenate, Multiply, Dropout, Subtract
 from keras.models import Model
 from keras.optimizers import Adam
 
-basestr = ''
+basestr = 'NasNetLarge'
 train_file_path = "../input/train_relationships.csv"
 train_folders_path = "../input/train/"
 val_famillies = "F09"
@@ -76,9 +77,9 @@ def baseline_model():
     input_1 = Input(shape=(224, 224, 3))
     input_2 = Input(shape=(224, 224, 3))
 
-    base_model = ResNet50(weights='imagenet', include_top=False)
+    base_model = NASNetLarge(weights='imagenet', include_top=False)
 
-    for x in base_model.layers[:-3]:
+    for x in base_model.layers:
         x.trainable = True
 
     x1 = base_model(input_1)
@@ -113,7 +114,7 @@ def baseline_model():
     return model
 
 
-file_path = "baseline_"+basestr+".h5"
+file_path = "baseline._"+basestr+".h5"
 
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
 
