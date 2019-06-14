@@ -195,7 +195,7 @@ def gen(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
             X2 = [choice(person_to_images_map[x[1]]) for x in bat]
             X2 = np.array([read_img(x, resize_picture) for x in X2])
 
-            yield [X1, X2], labels, bat
+            yield [X1, X2], labels
 
 
 # define model
