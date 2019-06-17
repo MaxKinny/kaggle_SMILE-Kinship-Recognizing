@@ -198,6 +198,43 @@ def gen(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
             yield [X1, X2], labels
 
 
+def gen_completely_separated(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
+    ppl = list(person_to_images_map.keys())
+    while True:
+        np.random.shuffle(list_tuples)
+        batches = chunker(list_tuples, batch_size // 2)
+        for bat in batches:
+            labels = [1] * len(bat)
+            # create a batch where annotation 0 means no relation and 1 means has, the data is (p1,p2).
+            # Therefore the data-annotation(element of a batch) pair have such form (p1,p2)-0,(p3,p4)-1 .....
+            while len(bat) < batch_size:
+                # randomly choose 2 persons' ID
+                p1 = choice(ppl)  # person's ID
+                p2 = choice(ppl)
+                p1 = choice(person_to_images_map[p1])
+                p2 = choice(person_to_images_map[p2])
+                # if 2 persons don't have relation then execute
+                # link all persons' without relation together with label 0
+                if p1 != p2 and (p1, p2) not in list_tuples and (p2, p1) not in list_tuples:
+                    bat.append((p1, p2))
+                    labels.append(0)
+                    # after that, labels = [1,1,1....1, 0,0,0,...]
+            # if person x[0] doesn't have picture(or directly call doesn't exist), then print his ID
+            # for x in bat:
+            #     if not len(person_to_images_map[x[0]]):
+            #         print(x[0])
+            # print(bat)
+            # print(labels)
+            # randomly choose a picture of every person in this batch
+            X1 = [x[0] for x in bat]
+            X1 = np.array([read_img(x, resize_picture) for x in X1])
+
+            X2 = [x[1] for x in bat]
+            X2 = np.array([read_img(x, resize_picture) for x in X2])
+
+            yield [X1, X2], labels
+
+
 # define model
 def baseline_model():
     # keras's input data structure, a tensor
