@@ -114,4 +114,23 @@ related or not. By using transfer learning we were able to achieve encouraging
 results of **0.81** in AUC ROC, especially given that the task of kinship 👪
 prediction is pretty hard even for humans.
 
-
+### vgg_face_splitmodel_kfold.py usage:
+Firstly, use argument "CreateKF" to create the division:
+```
+python vgg_face_splitmodel_kfold.py --CreateKF True --<other arguments> <values>
+```
+Secondly, use argument "SelectedK" to select validation part to feed into different GPUs. Suppose you have 4 GPUs and K = 4(4-folds), then input these respectively:
+```
+CUDA_VISIABLE_DEVICES=0 python vgg_face_splitmodel_kfold.py --SelectedK 1 --CreateKF False --<other arguments> <values>
+```
+```
+CUDA_VISIABLE_DEVICES=1 python vgg_face_splitmodel_kfold.py --SelectedK 2 --CreateKF False --<other arguments> <values>
+```
+```
+CUDA_VISIABLE_DEVICES=2 python vgg_face_splitmodel_kfold.py --SelectedK 3 --CreateKF False --<other arguments> <values>
+```
+```
+CUDA_VISIABLE_DEVICES=3 python vgg_face_splitmodel_kfold.py --SelectedK 4 --CreateKF False --<other arguments> <values>
+```
+After training, you will get 4 models with different validation part.
+**Tip:** The index of SelectedK starts from 1!
