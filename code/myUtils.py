@@ -14,6 +14,41 @@ from keras.applications.inception_resnet_v2 import InceptionResNetV2
 from keras.applications.xception import Xception
 from keras.applications.nasnet import NASNetLarge
 from tqdm import tqdm
+from sklearn.model_selection import StratifiedKFold
+
+
+def get_a_fold(x, y, split_result, selected_fold_num):
+    # Arguments:
+    #   x: data
+    #   y: annotation
+    #   split_result: sklearn's results, splitting indices
+    #   selected_fold_nun: selected part(1 ~ k)
+    # Return:
+    #   x_fold: real data, x_fold[0] training data, x_fold[1] means testing data
+    #   annotation_fold: real annotations data, y_fold[0] means training annotations,
+    #                    y_fold[1] means testing annotations
+    x_fold = []
+    x_fold.append([x[i] for i in split_result[selected_fold_num-1][0]])
+    x_fold.append([x[i] for i in split_result[selected_fold_num - 1][1]])
+
+    y_fold = []
+    y_fold.append([y[i] for i in split_result[selected_fold_num - 1][0]])
+    y_fold.append([y[i] for i in split_result[selected_fold_num - 1][1]])
+    return x_fold, y_fold
+
+
+def stratified_k_fold(x, y, k):
+    # Arguments:
+    #   x: data
+    #   y: annotation
+    #   k: splitting number
+    # Return:
+    #   split_result: splitting indices which is a list and every element is a tuple with 2 length
+    #       tuple[0] means training set's index
+    #       tuple[1] means testing set's index
+    skf = StratifiedKFold(n_splits=k)
+    split_result = list(skf.split(x, y))
+    return split_result
 
 
 def main():
