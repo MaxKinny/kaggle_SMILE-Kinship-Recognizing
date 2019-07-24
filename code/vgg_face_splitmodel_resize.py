@@ -1,7 +1,7 @@
 from collections import defaultdict
 from glob import glob
 from random import choice, sample
-from myUtils import gen, gen_over_sampling, gen_completely_separated
+from myUtils import gen, gen_over_sampling, gen_completely_separated, read_img
 from augmentation import seperation
 
 import cv2
@@ -141,15 +141,15 @@ model = baseline_model()
 print("********encoder's model structure********")
 print(model.summary())
 # model.load_weights(file_path)
-train_relation_tuple_list = seperation(train, train_person_to_images_map)
-model.fit_generator(gen_completely_separated(train_relation_tuple_list, train_person_to_images_map, batch_size=16),
+# train_relation_tuple_list = seperation(train, train_person_to_images_map)
+model.fit_generator(gen(train, train_person_to_images_map, batch_size=16, resize_picture=(197, 197)),
                     use_multiprocessing=True,
-                    validation_data=gen(val, val_person_to_images_map, batch_size=32),
-                    epochs=5,
+                    validation_data=gen(val, val_person_to_images_map, batch_size=16),
+                    epochs=200,
                     verbose=2,
                     workers=4,
                     callbacks=callbacks_list,
-                    steps_per_epoch=len(train_relation_tuple_list)//8 + 1,     # len(x_train)//(batch_size) ！！！！！！！！！！！！！
+                    steps_per_epoch=200, # len(train_relation_tuple_list)//8 + 1,     # len(x_train)//(batch_size) ！！！！！！！！！！！！！
                     validation_steps=10)
 
 test_path = "../input/test/"

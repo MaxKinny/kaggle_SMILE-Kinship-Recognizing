@@ -1,6 +1,8 @@
 from collections import defaultdict
 from glob import glob
 from random import choice, sample
+from myUtils import gen, gen_over_sampling, gen_completely_separated, read_img
+from augmentation import seperation
 
 import cv2
 import numpy as np
@@ -42,44 +44,44 @@ train = [x for x in relationships if val_famillies not in x[0]]
 val = [x for x in relationships if val_famillies in x[0]]
 
 
-def read_img(path):
-    img = cv2.imread(path)
-    img = np.array(img).astype(np.float)
-    return preprocess_input(img, version=2)
+# def read_img(path):
+#     img = cv2.imread(path)
+#     img = np.array(img).astype(np.float)
+#     return preprocess_input(img, version=2)
 
 
-def gen(list_tuples, person_to_images_map, batch_size=16):
-    ppl = list(person_to_images_map.keys())
-    while True:
-        batch_tuples = sample(list_tuples, batch_size // 2)
-        labels = [1] * len(batch_tuples)
-        while len(batch_tuples) < batch_size:
-            p1 = choice(ppl)
-            p2 = choice(ppl)
-
-            if p1 != p2 and (p1, p2) not in list_tuples and (p2, p1) not in list_tuples:
-                batch_tuples.append((p1, p2))
-                labels.append(0)
-
-        for x in batch_tuples:
-            if not len(person_to_images_map[x[0]]):
-                print(x[0])
-
-        X1 = [choice(person_to_images_map[x[0]]) for x in batch_tuples]
-        X1 = np.array([read_img(x) for x in X1])
-
-        X2 = [choice(person_to_images_map[x[1]]) for x in batch_tuples]
-        X2 = np.array([read_img(x) for x in X2])
-
-        yield [X1, X2], labels
+# def gen(list_tuples, person_to_images_map, batch_size=16):
+#     ppl = list(person_to_images_map.keys())
+#     while True:
+#         batch_tuples = sample(list_tuples, batch_size // 2)
+#         labels = [1] * len(batch_tuples)
+#         while len(batch_tuples) < batch_size:
+#             p1 = choice(ppl)
+#             p2 = choice(ppl)
+#
+#             if p1 != p2 and (p1, p2) not in list_tuples and (p2, p1) not in list_tuples:
+#                 batch_tuples.append((p1, p2))
+#                 labels.append(0)
+#
+#         for x in batch_tuples:
+#             if not len(person_to_images_map[x[0]]):
+#                 print(x[0])
+#
+#         X1 = [choice(person_to_images_map[x[0]]) for x in batch_tuples]
+#         X1 = np.array([read_img(x) for x in X1])
+#
+#         X2 = [choice(person_to_images_map[x[1]]) for x in batch_tuples]
+#         X2 = np.array([read_img(x) for x in X2])
+#
+#         yield [X1, X2], labels
 
 
 def baseline_model():
     input_1 = Input(shape=(224, 224, 3))
     input_2 = Input(shape=(224, 224, 3))
 
-    base_model1 = VGGFace(model='resnet50', include_top=False)
-    base_model2 = VGGFace(model='resnet50', include_top=False)
+    base_model1 = VGGFace(model='resnet50', include_top=False, name="vggface_resnet50_leg1")
+    base_model2 = VGGFace(model='resnet50', include_top=False, name="vggface_resnet50_leg2")
 
     for x in base_model1.layers[:-3]:
         x.trainable = True
@@ -113,7 +115,7 @@ def baseline_model():
 
     model = Model([input_1, input_2], out)
 
-    model.compile(loss="binary_crossentropy", metrics=['acc'], optimizer=Adam(0.00001))
+    model.compile(loss="binary_crossentropy", metrics=['acc'], optimizer=Adam(0.00001))  # default 1e-5
 
     model.summary()
 
@@ -136,10 +138,19 @@ tbCallBack = TensorBoard(log_dir='./logs/'+basestr,
 callbacks_list = [checkpoint, reduce_on_plateau, tbCallBack]
 
 model = baseline_model()
+print("********encoder's model structure********")
+print(model.summary())
 # model.load_weights(file_path)
-model.fit_generator(gen(train, train_person_to_images_map, batch_size=16), use_multiprocessing=True,
-                    validation_data=gen(val, val_person_to_images_map, batch_size=16), epochs=50, verbose=2,
-                    workers=4, callbacks=callbacks_list, steps_per_epoch=200, validation_steps=100)
+# train_relation_tuple_list = seperation(train, train_person_to_images_map)
+model.fit_generator(gen(train, train_person_to_images_map, batch_size=16),
+                    use_multiprocessing=True,
+                    validation_data=gen(val, val_person_to_images_map, batch_size=16),
+                    epochs=200,
+                    verbose=2,
+                    workers=4,
+                    callbacks=callbacks_list,
+                    steps_per_epoch=200, # len(train_relation_tuple_list)//8 + 1,     # len(x_train)//(batch_size) ！！！！！！！！！！！！！
+                    validation_steps=10)
 
 test_path = "../input/test/"
 
