@@ -109,3 +109,7 @@ venv.bak/
 .mypy_cache/
 
 *.pkl
+
+vggface2_inception_resnet_v1/model/
+
+vggface2_inception_resnet_v1/test/
