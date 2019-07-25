@@ -77,8 +77,8 @@ val = [x for x in relationships if val_famillies in x[0]]
 
 
 def baseline_model():
-    input_1 = Input(shape=(197, 197, 3))
-    input_2 = Input(shape=(197, 197, 3))
+    input_1 = Input(shape=(224, 224, 3))
+    input_2 = Input(shape=(224, 224, 3))
 
     base_model1 = VGGFace(model='resnet50', include_top=False, name="vggface_resnet50_leg1")
     base_model2 = VGGFace(model='resnet50', include_top=False, name="vggface_resnet50_leg2")
@@ -142,9 +142,9 @@ print("********encoder's model structure********")
 print(model.summary())
 # model.load_weights(file_path)
 # train_relation_tuple_list = seperation(train, train_person_to_images_map)
-model.fit_generator(gen(train, train_person_to_images_map, batch_size=16, resize_picture=(197, 197)),
+model.fit_generator(gen(train, train_person_to_images_map, batch_size=16),
                     use_multiprocessing=True,
-                    validation_data=gen(val, val_person_to_images_map, batch_size=16, resize_picture=(197, 197)),
+                    validation_data=gen(val, val_person_to_images_map, batch_size=16),
                     epochs=200,
                     verbose=2,
                     workers=4,
@@ -165,13 +165,12 @@ submission = pd.read_csv('../input/sample_submission.csv')
 
 predictions = []
 
-# model.load_weights("vgg_face_splitmodel.h5")
 for batch in tqdm(chunker(submission.img_pair.values)):
     X1 = [x.split("-")[0] for x in batch]
-    X1 = np.array([read_img(test_path + x, (197, 197)) for x in X1])
+    X1 = np.array([read_img(test_path + x) for x in X1])
 
     X2 = [x.split("-")[1] for x in batch]
-    X2 = np.array([read_img(test_path + x, (197, 197)) for x in X2])
+    X2 = np.array([read_img(test_path + x) for x in X2])
 
     pred = model.predict([X1, X2]).ravel().tolist()
     predictions += pred
