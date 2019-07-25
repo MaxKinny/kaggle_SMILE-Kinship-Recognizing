@@ -13,6 +13,8 @@ from keras.optimizers import Adam
 from keras.applications.inception_resnet_v2 import InceptionResNetV2
 from keras.applications.xception import Xception
 from keras.applications.nasnet import NASNetLarge
+from keras.preprocessing.image import ImageDataGenerator
+from keras.utils import multi_gpu_model
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold
 
@@ -52,6 +54,15 @@ def stratified_k_fold(x, y, k):
 
 
 def main():
+    # import tensorflow as tf
+    # import keras.backend.tensorflow_backend as KTF
+
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
+    # session = tf.Session(config=config)
+
+# # 设置session
+    # KTF.set_session(session)
     train_file_path = "../input/train_relationships.csv"
     train_folders_path = "../input/train/"
     val_famillies = "F09"  # use family NO.900 to validate
@@ -98,8 +109,7 @@ def main():
     callbacks_list = [checkpoint, reduce_on_plateau]
 
     model = baseline_model()
-    # model.load_weights(file_path)
-    model.fit_generator(gen_over_sampling(train, train_person_to_images_map, batch_size=16),
+    model.fit_generator(gen2(train, train_person_to_images_map, batch_size=16),
                         use_multiprocessing=True,
                         validation_data=gen(val, val_person_to_images_map, batch_size=16),
                         epochs=100,
@@ -108,6 +118,18 @@ def main():
                         callbacks=callbacks_list,
                         steps_per_epoch=200,
                         validation_steps=100)
+
+    model = multi_gpu_model(model, gpus=4)
+    # model.load_weights(file_path)
+    # model.fit_generator(gen_over_sampling(train, train_person_to_images_map, batch_size=16),
+                        # use_multiprocessing=True,
+                        # validation_data=gen(val, val_person_to_images_map, batch_size=16),
+                        # epochs=100,
+                        # verbose=2,
+                        # workers=4,
+                        # callbacks=callbacks_list,
+                        # steps_per_epoch=200,
+                        # validation_steps=100)
 
     #################################
     #########Testing Part############
@@ -196,6 +218,54 @@ def gen_over_sampling(list_tuples, person_to_images_map, batch_size=16, resize_p
         X2 = np.array([read_img(x, resize_picture) for x in X2])
 
         yield [X1, X2], labels
+
+def gen2(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
+    aug = ImageDataGenerator(
+        rotation_range=30,      # 旋转角度，整数
+        width_shift_range=0.1,  # 水平平移幅度
+        height_shift_range=0.1, # 上下平移幅度
+        brightness_range=(0.9, 1.1),   # 曝光范围
+        zoom_range=0.1,         # 随机缩放的比例，小于1时表示范围 [1-, 1+]
+        horizontal_flip=True,   # 水平翻转
+        fill_mode='nearest'     # 变换超出边界的处理
+    )
+    # print(aug.get_random_transform((224, 224, 3)))
+    ppl = list(person_to_images_map.keys())
+    while True:
+        np.random.shuffle(list_tuples)
+        batches = chunker(list_tuples, batch_size // 2)
+        for bat in batches:
+            labels = [1] * len(bat)
+            # create a batch where annotation 0 means no relation and 1 means has, the data is (p1,p2).
+            # Therefore the data-annotation(element of a batch) pair have such form (p1,p2)-0,(p3,p4)-1 .....
+            while len(bat) < batch_size:
+                # randomly choose 2 persons' ID
+                p1 = choice(ppl)  # person's ID
+                p2 = choice(ppl)
+                # if 2 persons don't have relation then execute
+                # link all persons' without relation together with label 0
+                if p1 != p2 and (p1, p2) not in list_tuples and (p2, p1) not in list_tuples:
+                    bat.append((p1, p2))
+                    labels.append(0)
+                    # after that, labels = [1,1,1....1, 0,0,0,...]
+            # if person x[0] doesn't have picture(or directly call doesn't exist), then print his ID
+            for x in bat:
+                if not len(person_to_images_map[x[0]]):
+                    print(x[0])
+            # print(bat)
+            # print(labels)
+            # randomly choose a picture of every person in this batch
+            X1 = [choice(person_to_images_map[x[0]]) for x in bat]
+            X1 = np.array([read_img(x, resize_picture) for x in X1])
+
+            X2 = [choice(person_to_images_map[x[1]]) for x in bat]
+            X2 = np.array([read_img(x, resize_picture) for x in X2])
+            for x1 in X1:
+                aug.random_transform(x1)
+            for x2 in X2:
+                aug.random_transform(x2)
+            # print(X1.shape, X2.shape)
+            yield [X1, X2], labels
 
 
 def gen(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
