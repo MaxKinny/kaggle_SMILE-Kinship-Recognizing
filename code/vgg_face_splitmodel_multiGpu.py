@@ -3,7 +3,7 @@ from glob import glob
 from myUtils import gen, gen_over_sampling, gen_completely_separated, get_a_fold, stratified_k_fold, read_img
 from augmentation import seperation
 from sklearn.externals import joblib
-
+import multiprocessing
 
 import numpy as np
 import pandas as pd
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     relationships = list(zip(relationships.p1.values, relationships.p2.values))
     relationships = [x for x in relationships if x[0] in ppl and x[1] in ppl]
     fake_annotation = np.ones(len(relationships))
-    if args.CreateKF == "True":
+    if False:
         # cos this dataset doesn't have directly annotations, so create a fake one to feed into stratified_k_fold function.
         print('********************', args.KNumber)
         kfolds_indices = stratified_k_fold(relationships, fake_annotation, int(args.KNumber))
@@ -128,12 +128,12 @@ if __name__ == '__main__':
         print(model.summary())
         # model.load_weights(file_path)
         # train_relation_tuple_list = seperation(train, person_to_images_map)
-        model.fit_generator(gen(train, person_to_images_map, batch_size=64),
+        model.fit_generator(gen(train, person_to_images_map, batch_size=2),
                             use_multiprocessing=True,
                             validation_data=gen(val, person_to_images_map, batch_size=16),
-                            epochs=200,
+                            epochs=1,
                             verbose=1,
-                            workers=8,
+                            workers=multiprocessing.cpu_count(),
                             callbacks=callbacks_list,
                             steps_per_epoch=200,
                             # len(train_relation_tuple_list)//8 + 1,     # len(x_train)//(batch_size) ！！！！！！！！！！！！！
