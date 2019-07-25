@@ -76,38 +76,53 @@ def baseline_model():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="KFold")
-    parser.add_argument('-s', '--SelectedK', default=1)
-    parser.add_argument('-c', '--CreateKF', default=True)
-    parser.add_argument('-k', '--KNumber', default=5)
-    args = parser.parse_args()
+    
+    # parser = argparse.ArgumentParser(description="KFold")
+    # parser.add_argument('-s', '--SelectedK', default=1)
+    # parser.add_argument('-c', '--CreateKF', default=True)
+    # parser.add_argument('-k', '--KNumber', default=5)
+    # args = parser.parse_args()
 
-    basestr = 'KFold'
+    basestr = '64batch'
     train_file_path = "../input/train_relationships.csv"
     train_folders_path = "../input/train/"
-
+    val_famillies = "F09"
+   
     all_images = glob(train_folders_path + "*/*/*.jpg")
-    person_to_images_map = defaultdict(list)
+    
+    train_images = [x for x in all_images if val_famillies not in x]
+    val_images = [x for x in all_images if val_famillies in x]
+   
+    train_person_to_images_map = defaultdict(list)
 
     ppl = [x.split("/")[-3] + "/" + x.split("/")[-2] for x in all_images]
 
-    for x in all_images:
-        person_to_images_map[x.split("/")[-3] + "/" + x.split("/")[-2]].append(x)
+    for x in train_images:
+        train_person_to_images_map[x.split("/")[-3] + "/" + x.split("/")[-2]].append(x)
 
+    val_person_to_images_map = defaultdict(list)
+    
+    for x in val_images:
+        val_person_to_images_map[x.split("/")[-3] + "/" + x.split("/")[-2]].append(x)
+	
     relationships = pd.read_csv(train_file_path)
     relationships = list(zip(relationships.p1.values, relationships.p2.values))
     relationships = [x for x in relationships if x[0] in ppl and x[1] in ppl]
-    fake_annotation = np.ones(len(relationships))
+    
+    train = [x for x in relationships if val_famillies not in x[0]]
+    val = [x for x in relationships if val_famillies in x[0]]
+    # fake_annotation = np.ones(len(relationships))
+   
     if False:
         # cos this dataset doesn't have directly annotations, so create a fake one to feed into stratified_k_fold function.
         print('********************', args.KNumber)
         kfolds_indices = stratified_k_fold(relationships, fake_annotation, int(args.KNumber))
         joblib.dump(kfolds_indices, 'kfold.pkl')  # save the folding results
     else:
-        kfolds_indices = joblib.load('kfold.pkl')
-        data, _ = get_a_fold(relationships, fake_annotation, kfolds_indices, int(args.SelectedK))
-        train = data[0]
-        val = data[1]
+        # kfolds_indices = joblib.load('kfold.pkl')
+        # data, _ = get_a_fold(relationships, fake_annotation, kfolds_indices, int(args.SelectedK))
+        # train = data[0]
+        # val = data[1]
         # print("Training relationship data:", train)
         # print("Validation relationship data:", val)
         file_path = "vgg_face_" + basestr + ".h5"
@@ -128,10 +143,10 @@ if __name__ == '__main__':
         print(model.summary())
         # model.load_weights(file_path)
         # train_relation_tuple_list = seperation(train, person_to_images_map)
-        model.fit_generator(gen(train, person_to_images_map, batch_size=2),
+        model.fit_generator(gen(train, train_person_to_images_map, batch_size=64),
                             use_multiprocessing=True,
-                            validation_data=gen(val, person_to_images_map, batch_size=16),
-                            epochs=1,
+                            validation_data=gen(val, val_person_to_images_map, batch_size=16),
+                            epochs=200,
                             verbose=1,
                             workers=multiprocessing.cpu_count(),
                             callbacks=callbacks_list,
@@ -164,4 +179,4 @@ if __name__ == '__main__':
 
         submission['is_related'] = predictions
 
-        submission.to_csv("vgg_face_" + basestr + str(args.SelectedK) + ".csv", index=False)
+        submission.to_csv("vgg_face_" + basestr + ".csv", index=False)
