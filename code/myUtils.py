@@ -221,7 +221,6 @@ def gen_over_sampling(list_tuples, person_to_images_map, batch_size=16, resize_p
 
 def gen2(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
     aug = ImageDataGenerator(
-        rotation_range=30,      # 旋转角度，整数
         width_shift_range=0.1,  # 水平平移幅度
         height_shift_range=0.1, # 上下平移幅度
         brightness_range=(0.9, 1.1),   # 曝光范围
@@ -229,7 +228,6 @@ def gen2(list_tuples, person_to_images_map, batch_size=16, resize_picture=()):
         horizontal_flip=True,   # 水平翻转
         fill_mode='nearest'     # 变换超出边界的处理
     )
-    # print(aug.get_random_transform((224, 224, 3)))
     ppl = list(person_to_images_map.keys())
     while True:
         np.random.shuffle(list_tuples)

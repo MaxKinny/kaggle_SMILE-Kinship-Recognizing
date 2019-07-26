@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras.layers import Input, Dense, GlobalMaxPool2D, GlobalAvgPool2D, Concatenate, Multiply, Dropout, Subtract
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.optimizers import Adam
 from keras_vggface.utils import preprocess_input
 from keras_vggface.vggface import VGGFace
@@ -65,15 +65,18 @@ def baseline_model():
     x = Dropout(0.01)(x)
     out = Dense(1, activation="sigmoid")(x)
 
-    model = Model([input_1, input_2], out)
+    model = Model([input_1, input_2], out) 
 
-    model = multi_gpu_model(model, gpus=4)
-    model.compile(loss="binary_crossentropy", metrics=['acc'], optimizer=Adam(0.00001))  # default 1e-5
-
-    model.summary()
+    # model.summary()
 
     return model
 
+class ParallelModelCheckpoint(ModelCheckpoint):
+    def __init__(self, model, filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', period=1):
+         self.single_model = model
+         super(ParallelModelCheckpoint, self).__init__(filepath, monitor, verbose, save_best_only, save_weights_only, mode, period=1)
+    def set_model(self, model):
+        super(ParallelModelCheckpoint, self).set_model(self.single_model)      
 
 if __name__ == '__main__':
     
@@ -127,7 +130,9 @@ if __name__ == '__main__':
         # print("Validation relationship data:", val)
         file_path = "vgg_face_" + basestr + ".h5"
 
-        checkpoint = ModelCheckpoint(file_path, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+        model_single = baseline_model()
+
+        checkpoint = ParallelModelCheckpoint(model_single, file_path, monitor='val_acc', verbose=1, save_best_only=True, mode='auto')
 
         reduce_on_plateau = ReduceLROnPlateau(monitor="val_acc", mode="max", factor=0.1, patience=20, verbose=1)
 
@@ -138,21 +143,25 @@ if __name__ == '__main__':
 
         callbacks_list = [checkpoint, reduce_on_plateau, tbCallBack]
 
-        model = baseline_model()
-        print("********encoder's model structure********")
-        print(model.summary())
+        model_parallel = multi_gpu_model(model_single, gpus=4)
+        model_parallel.compile(loss="binary_crossentropy", metrics=['acc'], optimizer=Adam(0.0001))  # default 1e-5
+        # print("********encoder's model structure********")
+        # print(model.summary())
         # model.load_weights(file_path)
         # train_relation_tuple_list = seperation(train, person_to_images_map)
-        model.fit_generator(gen(train, train_person_to_images_map, batch_size=64),
+        model_parallel.fit_generator(gen(train, train_person_to_images_map, batch_size=64),
                             use_multiprocessing=True,
                             validation_data=gen(val, val_person_to_images_map, batch_size=16),
-                            epochs=200,
+                            epochs=50,
                             verbose=1,
                             workers=multiprocessing.cpu_count(),
                             callbacks=callbacks_list,
                             steps_per_epoch=200,
                             # len(train_relation_tuple_list)//8 + 1,     # len(x_train)//(batch_size) ！！！！！！！！！！！！！
                             validation_steps=10)
+
+        # print(file_path)
+        model_single.load_weights(file_path)
 
         test_path = "../input/test/"
 
@@ -174,7 +183,7 @@ if __name__ == '__main__':
             X2 = [x.split("-")[1] for x in batch]
             X2 = np.array([read_img(test_path + x) for x in X2])
 
-            pred = model.predict([X1, X2]).ravel().tolist()
+            pred = model_single.predict([X1, X2]).ravel().tolist()
             predictions += pred
 
         submission['is_related'] = predictions
